@@ -1,0 +1,574 @@
+---
+title: "Project 2: Untidy Data"
+author: "Arauca Melendez"
+format: html
+execute:
+  echo: true
+  warning: false
+---
+
+# Introduction
+
+The purpose of this project is to practice working with wide-format data and preparing it for analysis using R. Three different datasets were selected and transformed from their original wide structures into tidy formats. The datasets cover different topics, including COVID-19 hospitalizations in New York City, adults with asthma in New York City, and population estimates for the ten most populated states in the United States.
+
+For each dataset, the original information was first preserved in a raw wide-format file. The data were then imported into R and cleaned using the tidyr and dplyr packages. The transformation process included reshaping the data from wide to long format, renaming variables, addressing missing or inconsistent values, and organizing the variables into a consistent structure. After the data were tidied, the requested analysis for each dataset was performed using only the resulting tidy data.
+
+The goal of the project is not only to produce the final analysis, but also to show a reproducible process for taking raw data and preparing it for downstream analysis.
+
+# Approach
+
+Each dataset was handled independently so that the transformation and analysis of one dataset did not affect the others. The first step for each dataset was to create a raw CSV file that preserved the original wide-format structure. These raw files were committed to the GitHub repository before the transformation process began.
+
+The raw datasets were imported into R using read.csv(). The structure of each dataset was examined before any transformations were made by reviewing the column names, dimensions, data types, and sample rows. The pivot_longer() function from the tidyr package was then used to reshape the appropriate columns from wide format into long format. The dplyr package was used to rename variables, organize the data, and address missing or inconsistent values when necessary.
+
+After each dataset was converted to a tidy format, the resulting data were used for the analysis associated with that dataset. Summary tables and visualizations were created where appropriate, and the results were interpreted based on the values observed in the tidy data. This process was repeated separately for all three datasets to maintain a clear and reproducible workflow.
+
+# Process
+
+## Dataset 1: NYC COVID-19 Hospitalizations
+
+### Data Source
+
+The first dataset comes from the New York City Department of Health and Mental Hygiene. The dataset summarizes COVID-19 hospitalizations among confirmed COVID-19 cases in New York City. The report includes hospitalization information by age group, sex, and borough. The data in the report reflect information available through April 26, 2020 at 6:00 PM.
+
+The original data were provided as a PDF report. The relevant tables were manually converted into a CSV file while maintaining a wide-format structure for use in the data tidying process.
+
+## Loading the data
+
+```{r}
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+```
+
+```{r}
+raw_covid <- read.csv("C:/Users/SPS Student/Downloads/covid_hospitalizations_wide.csv")
+```
+
+### Checking my data
+
+To ensure my data was uploaded correctly and R is processing it correctly, I went ahead and ran the four following commands:
+
+```{r}
+head(raw_covid)
+```
+
+```{r}
+str(raw_covid)
+```
+
+```{r}
+dim(raw_covid)
+```
+
+```{r}
+names(raw_covid)
+```
+
+## Data Transformation
+
+The raw dataset contains separate columns for the category type, category, hospitalized cases, hospitalization percentage, and all confirmed cases. To make the variables easier to work with, I standardized the column names using lowercase letters and underscores. I also checked for missing values before reshaping the data.
+
+The `pivot_longer()` function was used to convert the three measurement columns into a long format. This creates one column identifying the measurement and another containing its value. The category information remains available so that the hospitalization data can still be compared by age group, sex, and borough.
+
+**Standardizing the column names:**
+
+```{r}
+covid_clean <- raw_covid |>
+  rename_with(tolower) |>
+  rename(
+    category_type = category_type,
+    category = category,
+    hospitalized_cases = hospitalized_cases,
+    hospitalization_percent = hospitalization_percent,
+    all_cases = all_cases
+  )
+
+names(covid_clean)
+```
+
+**Checking for missing values in each column:**
+
+```{r}
+colSums(is.na(covid_clean))
+```
+
+**Checking the category types categories:**
+
+```{r}
+unique(covid_clean$category_type)
+
+unique(covid_clean$category)
+```
+**Converting the measurement format from wide to long:**
+```{r}
+covid_tidy <- covid_clean |>
+  pivot_longer(
+    cols = c(
+      hospitalized_cases,
+      hospitalization_percent,
+      all_cases
+    ),
+    names_to = "measure",
+    values_to = "value"
+  )
+```
+
+**Displaying the first few rows of the tidied dataset:**
+```{r}
+head(covid_tidy)
+```
+
+**Checking the dimensions**
+```{r}
+dim(covid_tidy)
+```
+**Checking the structure:**
+```{r}
+str(covid_tidy)
+```
+**Counting the observations for each measurement:**
+```{r}
+covid_tidy |>
+  count(measure)
+```
+
+## Data Analysis
+
+The analysis examines COVID-19 hospitalization patterns across age groups, sex, and boroughs in New York City. Summary tables and visualizations are used to compare hospitalized cases and hospitalization percentages across the reported categories. The analysis uses the tidy dataset created during the transformation process rather than the original raw dataset.
+
+Because the dataset contains different types of measurements, each measure is analyzed separately to avoid comparing counts directly with percentages.
+
+** Summarizing the number of hospital cases by category types:**
+```{r}
+hospitalized_summary <- covid_tidy |>
+  filter(measure == "hospitalized_cases") |>
+  select(category_type, category, value) |>
+  rename(hospitalized_cases = value)
+```
+
+**Summary table:**
+```{r}
+hospitalized_summary
+```
+
+**Summarizing the percentages of hospital cases:**
+```{r}
+hospitalization_percent_summary <- covid_tidy |>
+  filter(measure == "hospitalization_percent") |>
+  select(category_type, category, value) |>
+  rename(hospitalization_percent = value)
+```
+
+**Percentage Summary Table:**
+```{r}
+hospitalization_percent_summary
+```
+
+**Filtering the tidy data to hospitalization percentages by age group:**
+```{r}
+age_hospitalization <- covid_tidy |>
+  filter(
+    category_type == "Age Group",
+    measure == "hospitalization_percent",
+    category != "Unknown"
+  )
+```
+
+**GGPlot:Bar Chart**
+```{r}
+ggplot(age_hospitalization,
+       aes(x = category, y = value)) +
+  geom_col() +
+  labs(
+    title = "COVID-19 Hospitalization Percentage by Age Group",
+    x = "Age Group",
+    y = "Hospitalization Percentage (%)"
+  ) +
+  theme_minimal()
+```
+
+## Observation
+
+The hospitalization percentages were different across age groups. Adults aged 75 and older had the highest percentage at 62%, followed by adults aged 65–74 at 47%. Adults between 18 and 44 had a much lower percentage at 10%. This shows that older adults had higher reported hospitalization percentages among confirmed COVID-19 cases in this report.
+
+The findings should be interpreted in the context of the report's date and preliminary data. They describe the reported hospitalization percentages among confirmed cases at that time and should not be interpreted as current hospitalization risks or as proof that age alone caused the differences.
+
+## Conclusion
+
+This dataset provided an opportunity to practice converting wide-format data into a tidy format using R. The pivot_longer() function reorganized the hospitalization measurements so they could be analyzed separately. The analysis showed that the reported hospitalization percentage was highest among adults aged 75 and over at 62%, compared with 10% among adults aged 18–44. These results highlight differences in reported hospitalization percentages across age groups in the early months of the COVID-19 pandemic. The tidying process also made the data easier to filter, summarize, and visualize. However, the findings reflect preliminary data from April 2020 and should be understood within that context.
+
+
+# Process
+
+## Dataset 2:Adults with asthma
+
+### Data Source
+
+The second dataset I chose for this project comes from the NYC Environment & Health Data Portal. The dataset focuses on asthma among adults in New York City and provides public health information that can help show patterns in asthma across the city. I chose this dataset because it contains health data that can be organized and cleaned for easier analysis. The data will be reviewed and transformed using R, including the tidyr and dplyr packages, to make the information easier to understand and work with.
+
+## Loading the data
+
+```{r}
+library(tidyverse)
+
+raw_asthma <- read.csv(
+  "C:/Users/SPS Student/Documents/NYC EH Data Portal - Adults with asthma (full table).csv"
+)
+```
+
+### Checking my data
+
+```{r}
+head(raw_asthma)
+```
+
+```{r}
+str(raw_asthma)
+```
+
+```{r}
+dim(raw_asthma)
+```
+
+```{r}
+names(raw_asthma)
+```
+## Data Transformation
+
+
+The asthma dataset has three measurement columns: age-adjusted percentage, estimated number of adults, and percentage. The percentage columns also include confidence intervals, and some values have asterisks. I used `pivot_longer()` to combine the three measurement columns into one column and put their values in another column. Then, I separated the estimates from the confidence intervals, made the column names consistent, and kept track of values marked with an asterisk. These changes make the data easier to read and compare while keeping the important information.
+
+**Standardizing the variable names:**
+```{r}
+asthma_clean <- raw_asthma |>
+  rename_with(tolower) |>
+  rename(
+    time_period = timeperiod,
+    geo_type = geotype,
+    geo_id = geoid,
+    geo_rank = georank,
+    age_adjusted_percent = age.adjusted.percent
+  )
+```
+
+**Checking the updated column names:**
+```{r}
+asthma_clean <- raw_asthma |>
+  rename_with(tolower) |>
+  rename(
+    time_period = timeperiod,
+    geo_type = geotype,
+    geo_id = geoid,
+    geo_rank = georank,
+    age_adjusted_percent = age.adjusted.percent
+  )
+```
+
+**Checking for missing values:**
+```{r}
+colSums(is.na(asthma_clean))
+```
+**Count values that have asteriks:**
+```{r}
+sum(grepl("\\*", asthma_clean$age_adjusted_percent))
+sum(grepl("\\*", asthma_clean$number))
+sum(grepl("\\*", asthma_clean$percent))
+```
+**Reshaping the columns into long format:**
+```{r}
+asthma_long <- asthma_clean |>
+  pivot_longer(
+    cols = c(age_adjusted_percent, number, percent),
+    names_to = "measure",
+    values_to = "raw_value"
+  )
+```
+
+**Viewing the first rows:**
+```{r}
+head(asthma_long)
+```
+
+**Checking the dimensions:**
+```{r}
+head(asthma_long)
+```
+
+**Cleaning and seperating the values:**
+```{r}
+asthma_tidy <- asthma_long |>
+  mutate(
+    has_asterisk = grepl("\\*", raw_value),
+
+    cleaned_value = gsub("\\*", "", raw_value),
+
+    ci_text = ifelse(
+      grepl("\\(", cleaned_value),
+      sub(".*\\(([^()]*)\\).*", "\\1", cleaned_value),
+      NA_character_
+    ),
+
+    estimate_text = sub("\\s*\\(.*$", "", cleaned_value),
+
+    estimate = as.numeric(gsub(",", "", estimate_text)),
+
+    lower_ci = as.numeric(sub(",.*$", "", ci_text)),
+    upper_ci = as.numeric(sub("^.*,\\s*", "", ci_text))
+  ) |>
+  select(
+    time_period, geo_type, geo_id, geo_rank, geography,
+    measure, estimate, lower_ci, upper_ci, has_asterisk
+  )
+```
+
+**Inspecting the final tidy dataset:**
+```{r}
+head(asthma_tidy)
+```
+
+**Checking the structure and dimensions:**
+
+The values in raw_value contain a mixture of numbers, commas, confidence intervals, and asterisks. So I created separate columns for the numeric estimate, lower confidence limit, upper confidence limit, and asterisk flag.
+
+```{r}
+str(asthma_tidy)
+dim(asthma_tidy)
+```
+**Counting the observation for each measurement:**
+```{r}
+asthma_tidy |>
+  count(measure)
+```
+
+**Checking for the estimates that failed to convert to numeric:**
+```{r}
+names(asthma_tidy)
+```
+```{r}
+asthma_tidy |>
+  filter(is.na(estimate))
+```
+```{r}
+str(asthma_tidy$estimate)
+```
+```{r}
+names(asthma_long)
+```
+```{r}
+asthma_long |>
+  mutate(
+    estimate = readr::parse_number(raw_value)
+  ) |>
+  filter(is.na(estimate) & !is.na(raw_value))
+```
+
+## Data Analysis
+
+The analysis uses the tidy asthma dataset to examine how reported asthma estimates vary across geographic areas and reporting periods. Summary tables are used to compare the estimates, while a visualization helps show differences in the reported age-adjusted percentages. The numeric estimates are analyzed separately by measurement type because percentages and estimated counts represent different quantities.
+
+**Creating a summary table to compare the age-adjusted percentage of adults with asthma across the five boroughs**
+
+```{r}
+asthma_borough_summary <- asthma_tidy |>
+  filter(
+    measure == "age_adjusted_percent",
+    geo_type == "Borough"
+  ) |>
+  select(geography, estimate, lower_ci, upper_ci) |>
+  arrange(desc(estimate)) |>
+  rename(
+    borough = geography,
+    age_adjusted_percent = estimate,
+    lower_confidence_limit = lower_ci,
+    upper_confidence_limit = upper_ci
+  )
+```
+
+**Summary Table**
+```{r}
+asthma_borough_summary
+```
+**GG Plot: Barchart**
+```{r}
+ggplot(
+  asthma_borough_summary,
+  aes(
+    x = reorder(borough, age_adjusted_percent),
+    y = age_adjusted_percent
+  )
+) +
+  geom_col() +
+  coord_flip() +
+  labs(
+    title = "Age-Adjusted Asthma Estimates by NYC Borough",
+    x = "Borough",
+    y = "Age-Adjusted Percentage (%)"
+  ) +
+  theme_minimal()
+```
+
+## Observation
+
+The chart shows that the Bronx has the highest age-adjusted asthma percentage among the five NYC boroughs, at about 21%. Manhattan follows at approximately 15%, while Staten Island is around 14%. Brooklyn and Queens have lower percentages, at about 12% and 11%, respectively. Queens has the lowest percentage among the boroughs shown. Overall, the chart shows that age-adjusted asthma percentages vary across NYC boroughs, with the Bronx having a noticeably higher percentage than the other boroughs. These results show differences in asthma estimates across the city, but they do not explain what may be causing those differences.
+
+## Conclusion
+
+This dataset provided practice cleaning and reshaping public health estimates into a tidy format. Using `pivot_longer()`, I organized three measurement columns into a consistent structure. I also separated the numeric estimates from their confidence intervals and retained flags for values marked with asterisks. The tidy data made it possible to compare age-adjusted asthma estimates across boroughs and neighborhoods and create a visualization of the results.
+
+# Process
+
+## Dataset 3: U.S. Census Top 10 States Population, 2020–2022
+
+### Data Source
+
+The third dataset contains population estimates for the top 10 states in the United States from 2020 to 2022. The data include each state's rank, geographic area, and population estimates for 2020, 2021, and 2022. This dataset can be used to examine how state populations changed over the three-year period.
+
+## Loading the Data
+
+```{r}
+library(tidyverse)
+
+raw_population <- read.csv(
+  "C:/Users/SPS Student/Documents/census_top10_states_2022_untidy.csv"
+)
+```
+
+### Checking the data
+
+```{r}
+head(raw_population)
+```
+
+```{r}
+str(raw_population)
+```
+```{r}
+dim(raw_population)
+```
+```{r}
+names(raw_population)
+```
+## Data Transformation
+
+```{r}
+names(raw_population)
+```
+```{r}
+head(raw_population)
+```
+```{r}
+population_clean <- raw_population |>
+  rename(
+    rank = Rank,
+    state = Geographic.Area,
+    population_2020 = April.1..2020..Estimates.Base.,
+    population_2021 = July.1..2021,
+    population_2022 = July.1..2022
+  )
+```
+
+```{r}
+head(population_clean)
+```
+
+```{r}
+names(population_clean)
+```
+
+**Converting to long format from wide:**
+```{r}
+population_tidy <- population_clean |>
+  pivot_longer(
+    cols = starts_with("population_"),
+    names_to = "year",
+    values_to = "population"
+  ) |>
+  mutate(
+    year = recode(
+      year,
+      population_2020 = "2020",
+      population_2021 = "2021",
+      population_2022 = "2022"
+    )
+  )
+```
+
+```{r}
+population_tidy <- population_clean |>
+  pivot_longer(
+    cols = starts_with("population_"),
+    names_to = "year",
+    values_to = "population"
+  ) |>
+  mutate(
+    year = recode(
+      year,
+      population_2020 = "2020",
+      population_2021 = "2021",
+      population_2022 = "2022"
+    )
+  )
+```
+
+```{r}
+head(population_tidy)
+```
+
+```{r}
+str(population_tidy)
+```
+**Checking the number of rows:**
+```{r}
+nrow(population_tidy)
+```
+**Checking what states are included:**
+```{r}
+unique(population_tidy$state)
+```
+**COunting the rows for each year:**
+```{r}
+table(population_tidy$year)
+```
+**Checking to see if any values are missing"**
+```{r}
+sum(is.na(population_tidy$population))
+```
+
+```{r}
+print(population_tidy, n = 30)
+```
+**Checking for missing values:**
+```{r}
+colSums(is.na(population_tidy))
+```
+**Checking the structure**
+```{r}
+str(population_tidy)
+```
+```{r}
+
+library(ggplot2)
+library(scales)
+
+ggplot(population_tidy, aes(x = year, y = population, group = state, color = state)) +
+  geom_line() +
+  geom_point() +
+  scale_y_continuous(labels = label_comma()) +
+  labs(
+    title = "Population Changes in the 10 Most Populous States (2020–2022)",
+    x = "Year",
+    y = "Population",
+    color = "State"
+  ) +
+  theme_minimal()
+```
+
+## Data Analysis
+
+After cleaning and tidying the population dataset, I analyzed population estimates for the 10 most populous states from 2020 through 2022. I used a line graph to compare population changes over the three years.The results showed that California had the largest population among the 10 states, but its population decreased from approximately 39.5 million in 2020 to 39.0 million in 2022. Texas and Florida showed population growth during the same period. Texas increased from approximately 29.1 million to 30.0 million, while Florida increased from approximately 21.5 million to 22.2 million.Other states showed smaller changes. New York's population decreased from approximately 20.2 million in 2020 to 19.7 million in 2022. Michigan also experienced a small decline, while Georgia and North Carolina experienced population growth. Overall, the data shows that population changes differed across states between 2020 and 2022. The line graph made it easier to compare these changes over time. However, the data only covers three years, so it does not establish whether these trends continued beyond 2022.
+
+## Conclusion
+
+Working with these three datasets helped me understand the importance of cleaning and tidying data before analyzing it. Each dataset required a different approach to organize the information and make it easier to understand. The COVID-19 hospitalization dataset showed differences in hospitalization percentages across age groups during the early stages of the pandemic. The adults-with-asthma dataset required checking and correcting data values to make sure the information was organized properly for analysis. The population dataset allowed me to compare population changes across the 10 most populous states from 2020 through 2022.
+Overall, this project showed me how data tidying can make information easier to compare, summarize, and visualize. I also learned that it is important to check column names, data types, missing values, and unusual numbers before drawing conclusions. Although each dataset presented different challenges, organizing the data into a consistent format made it easier to analyze the results and identify patterns. This project helped me become more comfortable using R and understand how data cleaning is an important part of the data analysis process.
